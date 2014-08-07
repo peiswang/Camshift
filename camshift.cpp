@@ -5,7 +5,7 @@
 #include "matrix.h"
 #include "camshift.h"
 
-int meanshift( BaseMatrix<unsigned char> *proMat, Rect &win_rect, int max_iter, double epsilon )
+int meanshift( BaseMatrix<unsigned char> *proMat, Rectangle &win_rect, int max_iter, double epsilon )
 {
     double eps = epsilon * epsilon;
     BaseMatrix<unsigned char> win_mat;
@@ -50,7 +50,7 @@ int meanshift( BaseMatrix<unsigned char> *proMat, Rect &win_rect, int max_iter, 
     return i;
 }
 
-int camshift( BaseMatrix<unsigned char> *proMat, Rect &win_rect, int max_iter, double epsilon )
+int camshift( BaseMatrix<unsigned char> *proMat, Rectangle &win_rect, int max_iter, double epsilon )
 {
     const int TOLERANCE = 15;
     int iter_num = 0;

@@ -4,7 +4,7 @@
 
 #include "matrix.h"
 
-int meanshift( BaseMatrix<unsigned char> *proMat, Rect &window, int max_iter, double epsilon );
-int camshift( BaseMatrix<unsigned char> *proMat, Rect &window, int max_iter, double epsilon );
+int meanshift( BaseMatrix<unsigned char> *proMat, Rectangle &window, int max_iter, double epsilon );
+int camshift( BaseMatrix<unsigned char> *proMat, Rectangle &window, int max_iter, double epsilon );
 
 #endif

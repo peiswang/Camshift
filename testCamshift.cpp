@@ -7,6 +7,13 @@
 #include <ctype.h>
 #include "opencv2/opencv.hpp"  
 #include "camshift.h"
+#include "sqKmeans.h"
+
+using namespace cv;
+using namespace std;
+
+vector<Rect> detectObject(Mat& img, CascadeClassifier& classifier, double scale);
+Rect detectMaxObject(Mat& img, CascadeClassifier& classifier, double scale);
 
 IplImage *image = 0, *hsv = 0, *hue = 0, *mask = 0, *backproject = 0, *histimg = 0;
 CvHistogram *hist = 0;
@@ -51,7 +58,7 @@ void myCamshift( IplImage *backproject, CvRect &track_window )
     int width = backproject->width;
     int height = backproject->height;
     bp_mat = cvtToBM(backproject);
-    Rect r;
+    Rectangle r;
     r.x = track_window.x;
     r.y = track_window.y;
     r.width = track_window.width;
@@ -127,7 +134,14 @@ CvScalar hsv2rgb( float hue )
 int main( int argc, char** argv )
 {
     CvCapture* capture = 0;
-    
+
+	// hand detect related
+    CascadeClassifier palmClassifier;
+    bool flag = false;
+    SqKmeans sq(10,8);
+	palmClassifier.load("palm.xml");
+    // hand detect related end
+
     if( argc == 1 || (argc == 2 && strlen(argv[1]) == 1 && isdigit(argv[1][0])))
         capture = cvCaptureFromCAM( argc == 2 ? argv[1][0] - '0' : 0 );
     else if( argc == 2 )
@@ -162,6 +176,8 @@ int main( int argc, char** argv )
         frame = cvQueryFrame( capture );
         if( !frame )
             break;
+        if( frame->origin == IPL_ORIGIN_TL )
+            cvFlip( frame, NULL, 1);
 
         if( !image )
         {
@@ -178,13 +194,35 @@ int main( int argc, char** argv )
         }
 
         cvCopy( frame, image, 0 );
-        cvFlip( image, NULL, 1);
-
-        char saveName[10];
-        //sprintf(saveName, "pic%d.jpg", count++);
-        //cvSaveImage(saveName, image);
 
         cvCvtColor( image, hsv, CV_BGR2HSV );
+
+	    //hand detect
+        if(!flag)
+        {
+            Mat frameCopy = frame;
+            Rect maxHand = detectMaxObject(frameCopy, palmClassifier, 1);
+            if(maxHand.area()>0)
+            {
+                //cvRectangle(image, maxHand, CV_RGB(0,0,255), 3, 8, 0);
+                if(sq.add(maxHand.x,maxHand.y,maxHand.width,maxHand.height))
+                {
+                    int x,y,w,h;
+                    sq.getResult(x,y,w,h);
+
+                    selection.x = MAX( x, 0 );
+                    selection.y = MAX( y, 0 );
+                    selection.width = MIN( w, image->width );
+                    selection.height = MIN( h, image->height );
+
+                    track_object = -1;
+
+                    printf("+++++++++++++++ hand found\n");
+                    flag = true;
+                    sq.release();
+                }
+            }
+        }
 
         if( track_object )
         {
@@ -221,17 +259,8 @@ int main( int argc, char** argv )
 
             int min=256, max=-1;
             cvCalcBackProject( &hue, backproject, hist );
-            for(int i=0;i<backproject->height;i++)
-            {
-                unsigned char *ptr = (unsigned char*)backproject->imageData + i * backproject->widthStep;
-                for(int j=0;j< backproject->width;j++)
-                {
-                   if(ptr[j]<min) min = ptr[j]; 
-                   if(ptr[j]>max) max= ptr[j]; 
-                }
-            }
-            //printf("min = %d, max = %d \n", min, max);
             cvAnd( backproject, mask, backproject, 0 );
+
             myCamshift( backproject, track_window );
                         
                        
@@ -293,7 +322,44 @@ int main( int argc, char** argv )
     return 0;
 }
 
-#ifdef _EiC
-main(1,"camshiftdemo.c");
-#endif
+// TestHandDetect.cpp : Defines the entry point for the console application.
 
+
+
+vector<Rect> detectObject(Mat& img, CascadeClassifier& classifier, double scale)
+{
+	vector<Rect> objs;
+	vector<Rect> objs_src;
+	Mat gray, smallImg(cvRound(img.rows/scale), cvRound(img.cols/scale), CV_8UC1);
+	cvtColor(img, gray, CV_BGR2GRAY);
+	resize(gray, smallImg, smallImg.size(), 0, 0, INTER_LINEAR);
+	equalizeHist(smallImg, smallImg);
+
+	classifier.detectMultiScale(smallImg, objs, 1.1, 2, 0|CV_HAAR_SCALE_IMAGE|CV_HAAR_FIND_BIGGEST_OBJECT, Size(30,30));
+				// CV_HAAR_FIND_BIGGEST_OBJECT
+	for(vector<Rect>::const_iterator r=objs.begin(); r!=objs.end();r++)
+	{
+		Rect rect(cvRound(r->x*scale), cvRound(r->y*scale), cvRound(r->width*scale), cvRound(r->height*scale));
+		objs_src.push_back(rect);
+	}
+	return objs_src;
+}
+
+Rect detectMaxObject(Mat& img, CascadeClassifier& classifier, double scale)
+{
+	vector<Rect> objs;
+	vector<Rect> objs_src;
+	Mat gray, smallImg(cvRound(img.rows/scale), cvRound(img.cols/scale), CV_8UC1);
+	cvtColor(img, gray, CV_BGR2GRAY);
+	resize(gray, smallImg, smallImg.size(), 0, 0, INTER_LINEAR);
+	equalizeHist(smallImg, smallImg);
+
+	classifier.detectMultiScale(smallImg, objs, 1.1, 2, 0|CV_HAAR_SCALE_IMAGE|CV_HAAR_FIND_BIGGEST_OBJECT, Size(30,30));
+    if(objs.size()>0)
+    {
+        Rect r = objs[0];
+	    Rect rect(cvRound(r.x*scale), cvRound(r.y*scale), cvRound(r.width*scale), cvRound(r.height*scale));
+        return rect;
+    }
+	return Rect(0,0,0,0);
+}

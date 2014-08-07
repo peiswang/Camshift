@@ -62,7 +62,7 @@ public:
         return elements2d[idr][idc];
     }
 
-    void getSubRect( BaseMatrix<T> *mat, Rect r )
+    void getSubRect( BaseMatrix<T> *mat, Rectangle r )
     {
         r.x = r.x<0 ? 0 : r.x>=cols ? cols-1 : r.x;
         r.y = r.y<0 ? 0 : r.y>=rows ? rows-1 : r.y;

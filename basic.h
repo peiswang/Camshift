@@ -13,7 +13,7 @@ typedef struct
     int y;
     int width;
     int height;
-} Rect;
+} Rectangle;
 
 typedef struct
 {
